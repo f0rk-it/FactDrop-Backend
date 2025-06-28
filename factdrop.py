@@ -44,7 +44,7 @@ def send_welcome(message: Message):
     if not existing.data:
         supabase.table('Subscribers').insert({'chat_id': chat_id}).execute()
     
-    bot.send_message(message, welcome_message, parse_mode='Markdown')
+    bot.send_message(chat_id, welcome_message, parse_mode='Markdown')
  
 # /random   
 @bot.message_handler(commands=['random'])
@@ -52,7 +52,7 @@ def send_random_fact(message: Message):
     chat_id = message.chat.id
     bot.send_chat_action(chat_id, 'typing')
     random_fact = get_random_fact()
-    bot.send_message(message, random_fact)
+    bot.send_message(chat_id, random_fact)
 
 # /unsubscribe
 @bot.message_handler(commands=['unsubscribe'])
@@ -61,14 +61,14 @@ def unsubscribe_user(message: Message):
     try:
         supabase.table('Subscribers').delete().eq('chat_id', chat_id).execute()
         bot.send_message(
-            message,
+            chat_id,
             "❌ You've been unsubscribed from daily facts.\n\n"
             "If you change your mind, just send /start again to hop back in! 🚀",
             parse_mode='Markdown'
         )
     except Exception as e:
         print(f"[!] Error unsubscribing {chat_id}: {e}")
-        bot.send_message(message, "⚠️ Something went wrong. Try again later.", parse_mode='Markdown')
+        bot.send_message(chat_id, "⚠️ Something went wrong. Try again later.", parse_mode='Markdown')
         
 # /time
 @bot.message_handler(commands=['time'])
@@ -78,20 +78,20 @@ def send_delivery_time(message: Message):
     try:
         response = supabase.table('Subscribers').select('*').eq('chat_id', chat_id).execute()
         if not response.data:
-            bot.send_message(message, "ℹ️ You're not subscribed yet. Use /start to begin receiving daily facts.", parse_mode='Markdown')
+            bot.send_message(chat_id, "ℹ️ You're not subscribed yet. Use /start to begin receiving daily facts.", parse_mode='Markdown')
             return
         
         sub_time = datetime.fromisoformat(response.data[0]['subscribed_at'])
         utc_time = sub_time.time().strftime('%H:%M')
         
         bot.send_message(
-            message,
+            chat_id,
             f"🕒 Your daily fact will be sent every day at *{utc_time} UTC*.",
             parse_mode='Markdown'
         )
     except Exception as e:
         print(f"[!] Error fetching time for {chat_id}: {e}")
-        bot.send_message(message, "⚠️ Couldn't fetch your delivery time.", parse_mode='Markdown')
+        bot.send_message(chat_id, "⚠️ Couldn't fetch your delivery time.", parse_mode='Markdown')
     
 # Daily job
 def send_daily_facts():
