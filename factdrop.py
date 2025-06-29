@@ -6,6 +6,7 @@ import requests
 from db import supabase
 from datetime import datetime, UTC
 from apscheduler.schedulers.background import BackgroundScheduler
+import random
 
 load_dotenv()
 
@@ -22,6 +23,25 @@ welcome_message = (
     "🧠 Want one now? Just type /random\n\n"
     "Ready to blow your mind? Let's go 🚀"
 )
+
+def get_unseen_fact(chat_id):
+    seen = supabase.table('SeenFacts').select('fact_id').eq('chat_id', chat_id).execute().data
+    seen_ids = [item['fact_id'] for item in seen]
+    
+    all_facts = supabase.table('Facts').select('*').execute().data
+    unseen_facts = [fact for fact in all_facts if fact['id'] not in seen_ids]
+    
+    if not unseen_facts:
+        unseen_facts = all_facts
+    
+    fact = random.choice(unseen_facts)
+    
+    supabase.table('SeenFacts').insert({
+        'chat_id': chat_id,
+        'fact_id': fact['id']
+    }).execute()
+    
+    return fact['fact']
 
 def get_random_fact():
     url = 'https://uselessfacts.jsph.pl/api/v2/facts/random'
@@ -51,8 +71,14 @@ def send_welcome(message: Message):
 def send_random_fact(message: Message):
     chat_id = message.chat.id
     bot.send_chat_action(chat_id, 'typing')
-    random_fact = get_random_fact()
-    bot.send_message(chat_id, random_fact)
+    try:
+        fact = get_unseen_fact(chat_id)
+        bot.send_message(chat_id, fact, parse_mode='Markdown')
+        
+    except Exception as e:
+        print(f"[!] Error fetching random fact for {chat_id}: {e}")
+        fallback_fact = get_random_fact()
+        bot.send_message(chat_id, fallback_fact, parse_mode='Mardown')
 
 # /unsubscribe
 @bot.message_handler(commands=['unsubscribe'])
@@ -94,7 +120,8 @@ def send_delivery_time(message: Message):
         bot.send_message(chat_id, "⚠️ Couldn't fetch your delivery time.", parse_mode='Markdown')
     
 # Daily job
-def send_daily_facts():
+def send_daily_facts(message: Message):
+    chat_id = message.chat.id
     now = datetime.now(UTC)
     try:
         subscribers = supabase.table('Subscribers').select('*').execute().data
@@ -102,7 +129,7 @@ def send_daily_facts():
         print(f"[!] Failed to fetch subscribers: {e}")
         return
     
-    fact = get_daily_fact()
+    fact = get_unseen_fact(chat_id)
     for sub in subscribers:
         try:
             sub_time = datetime.fromisoformat(sub['subscribed_at'])
