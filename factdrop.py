@@ -120,8 +120,7 @@ def send_delivery_time(message: Message):
         bot.send_message(chat_id, "⚠️ Couldn't fetch your delivery time.", parse_mode='Markdown')
     
 # Daily job
-def send_daily_facts(message: Message):
-    chat_id = message.chat.id
+def send_daily_facts():
     now = datetime.now(UTC)
     try:
         subscribers = supabase.table('Subscribers').select('*').execute().data
@@ -129,13 +128,19 @@ def send_daily_facts(message: Message):
         print(f"[!] Failed to fetch subscribers: {e}")
         return
     
-    fact = get_unseen_fact(chat_id)
     for sub in subscribers:
         try:
+            chat_id = sub['chat_id']
             sub_time = datetime.fromisoformat(sub['subscribed_at'])
             if sub_time.hour == now.hour:
-                bot.send_message(sub['chat_id'], f"🗓️ *Daily Fact*:\n\n{fact}", parse_mode='Markdown')
-                print(f"✅ Sent to {sub['chat_id']} at hour {now.hour}")
+                try:
+                    fact = get_unseen_fact(chat_id)
+                    bot.send_message(sub['chat_id'], f"🗓️ *Daily Fact*:\n\n{fact}", parse_mode='Markdown')
+                    print(f"✅ Sent to {sub['chat_id']} at hour {now.hour}")
+                except Exception as e:
+                    print(f"[!] Error sending fact to {sub['chat_id']}: {e}")
+                    fallback_fact = get_random_fact()
+                    bot.send_message(sub['chat_id'], f"⚠️ Error fetching daily fact. Here's a random one:\n\n{fallback_fact}", parse_mode='Markdown')
         except Exception as e:
             print(f"[!] Error sending to {sub['chat_id']}: {e}")
             
